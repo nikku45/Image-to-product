@@ -12,7 +12,16 @@ def test_default_settings():
     assert "http://localhost:3000" in settings.cors_origins
 
 
-def test_cors_origins_parsing_from_string():
-    """Verify that comma-separated CORS strings are properly converted to lists."""
+def test_cors_origins_parsing_from_string(monkeypatch):
+    """Verify comma-separated CORS origins from the environment become a list."""
+    monkeypatch.setenv("CORS_ORIGINS", "https://shop.vercel.app, https://preview.vercel.app")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.cors_origins == ["https://shop.vercel.app", "https://preview.vercel.app"]
+
+
+def test_cors_origins_parsing_from_init_value():
+    """Verify comma-separated CORS values passed to Settings become a list."""
     settings = Settings(CORS_ORIGINS="http://example.com, https://app.example.com")
     assert settings.cors_origins == ["http://example.com", "https://app.example.com"]

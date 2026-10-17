@@ -119,6 +119,7 @@
 - [x] Add Vercel Next.js project configuration for the frontend directory
 - [x] Document external PostgreSQL URL, provider secrets, CORS, and deployment steps
 - [x] Fix Gemini runtime dependency declarations (`google-genai` and `google-api-core`) required for clean Render startup
+- [x] Fix `CORS_ORIGINS` environment parsing for comma-separated Vercel origins and cover with an environment-source regression test
 - [ ] Deploy backend to Render and verify health endpoint
 - [ ] Deploy frontend to Vercel and verify backend connectivity
 - [ ] Environment variable validation in production mode

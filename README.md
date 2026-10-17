@@ -398,7 +398,7 @@ The repository-root [`render.yaml`](./render.yaml) is a Render Blueprint for the
 2. When prompted, provide these environment values:
    - `DATABASE_URL`: your externally hosted PostgreSQL connection URL. Use a URL reachable from Render; include any SSL parameters your provider requires.
    - `GEMINI_API_KEY` and `SERPAPI_API_KEY`: your provider credentials.
-   - `CORS_ORIGINS`: the Vercel production origin, for example `https://your-project.vercel.app` (no trailing slash). Add any custom frontend origin as a comma-separated value.
+   - `CORS_ORIGINS`: the Vercel production origin, for example `https://your-project.vercel.app` (no trailing slash). Add any custom frontend origin as a comma-separated value, with no JSON brackets or quotes. Set this in the Render service's Environment settings; editing a local `.env` file does not update Render.
 3. Keep these values in Render's environment settings. Do not put real credentials in `render.yaml` or commit them.
 4. After the first deploy, verify `https://<render-service>.onrender.com/api/health`.
 
