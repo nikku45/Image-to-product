@@ -404,6 +404,8 @@ The repository-root [`render.yaml`](./render.yaml) is a Render Blueprint for the
 
 The free Render web service can spin down when idle and take time to wake on the next request. Its filesystem is ephemeral; search history is stored in your external PostgreSQL database, not on the service disk. Free services are subject to Render's current usage limits.
 
+The backend dependency manifests include both `google-genai` (the Gemini SDK used by the adapter) and `google-api-core` (the API error types imported by the adapter). Keep both declared so clean Render builds can import the backend.
+
 ### Frontend: Vercel
 
 Vercel's native Git integration is used rather than a deployment YAML workflow. [`frontend/vercel.json`](./frontend/vercel.json) identifies the Next.js framework and build command; the Vercel project setting supplies the monorepo root.
