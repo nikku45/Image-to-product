@@ -1,6 +1,6 @@
 """
 Unit and Integration Tests for Phase 8: Persistence and Search History.
-Tests SQLite schema initialization, SearchRepository operations,
+Tests database URL handling, SQLite schema initialization, SearchRepository operations,
 API search history pagination, candidate confirmation, and persistence across restarts.
 """
 
@@ -9,10 +9,42 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from app.database import Base
+from app.database import Base, normalize_database_url
 from app.models.search import SearchModel, ImageAnalysisModel, ProductCandidateModel
 from app.repositories.search_repository import SearchRepository
 from app.schemas.product import ImageAnalysis, ProductCandidate
+
+
+@pytest.mark.parametrize(
+    ("database_url", "expected_url"),
+    [
+        (
+            "postgres://user:password@host:5432/products",
+            "postgresql+psycopg://user:password@host:5432/products",
+        ),
+        (
+            "postgresql://user:password@host:5432/products?sslmode=require",
+            "postgresql+psycopg://user:password@host:5432/products?sslmode=require",
+        ),
+        (
+            "postgresql+psycopg://user:password@host:5432/products",
+            "postgresql+psycopg://user:password@host:5432/products",
+        ),
+        ("sqlite:///./data/app.db", "sqlite:///./data/app.db"),
+    ],
+)
+def test_normalize_database_url(database_url: str, expected_url: str):
+    assert normalize_database_url(database_url) == expected_url
+
+
+def test_postgresql_url_creates_engine_with_psycopg():
+    engine = create_engine(
+        normalize_database_url("postgresql://user:password@localhost:5432/products")
+    )
+    try:
+        assert engine.url.drivername == "postgresql+psycopg"
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture

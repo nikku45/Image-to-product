@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: image-to-product-api
+    runtime: python
+    plan: free
+    branch: master
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.3
+      - key: APP_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SERPAPI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_TIMEOUT_SECONDS
+        value: 120
+      - key: MAX_UPLOAD_SIZE_MB
+        value: 10
+      - key: MAX_SEARCH_QUERIES
+        value: 3
+      - key: MAX_CANDIDATES_PER_QUERY
+        value: 15

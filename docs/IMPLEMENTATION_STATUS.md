@@ -100,11 +100,13 @@
 - [x] Verify end-to-end browser workflow (verified via Next.js Turbopack build & browser subagent)
 
 ### Phase 8 — Persistence and Search History
-- [x] Create SQLite database models (SearchModel, ImageAnalysisModel, ProductCandidateModel, MatchFeedbackModel in `backend/app/models/search.py`)
+- [x] Create SQLAlchemy database models (SearchModel, ImageAnalysisModel, ProductCandidateModel, MatchFeedbackModel in `backend/app/models/search.py`)
+- [x] Support PostgreSQL connection URLs from environment variables, including Render's `postgres://` URLs; retain SQLite for local development
+- [x] Declare SQLAlchemy and psycopg 3 in backend dependency manifests
 - [x] Implement repository abstraction (`SearchRepository` in `backend/app/repositories/search_repository.py`)
 - [x] Add search history endpoint `GET /api/product-matches` with pagination
 - [x] Candidate confirmation endpoint `POST /api/product-matches/{id}/confirm` (persisting feedback & updating confirmed ASIN)
-- [x] Integration tests verifying persistence across server restarts (7 unit & integration tests in `test_persistence.py`)
+- [x] Integration tests verifying persistence across server restarts (`test_persistence.py`)
 
 ### Phase 9 — Evaluation and Reliability
 - [ ] Curate 100-sample labelled evaluation dataset
@@ -113,7 +115,11 @@
 - [ ] Document reliability findings
 
 ### Phase 10 — Deployment and Handover
-- [ ] Docker / production configuration
+- [x] Add Render Blueprint for a free Python web service; do not provision a Render database
+- [x] Add Vercel Next.js project configuration for the frontend directory
+- [x] Document external PostgreSQL URL, provider secrets, CORS, and deployment steps
+- [ ] Deploy backend to Render and verify health endpoint
+- [ ] Deploy frontend to Vercel and verify backend connectivity
 - [ ] Environment variable validation in production mode
 - [ ] End-to-end live smoke test
 - [ ] Operations guide and final handover documentation
@@ -124,12 +130,12 @@
 
 | Suite | Status | Details |
 |---|---|---|
-| **Backend Unit Tests** | PASS | 74/74 passed (pytest: `test_health.py`, `test_config.py`, `test_image_validation.py`, `test_gemini_analysis.py`, `test_serpapi_search.py`, `test_matching_service.py`, `test_price_seller_validation.py`, `test_persistence.py` in 3.04s) |
+| **Backend Unit Tests** | PASS | 82/82 passed (pytest full backend suite, including PostgreSQL URL normalization and psycopg engine initialization) |
 | **Backend Live Health Check** | PASS | HTTP 200 OK via `http://127.0.0.1:8000/api/health` |
 | **Gemini Multimodal Vision** | PASS | Verified structured output schema, bounds, and REST transport |
 | **SerpApi Live Integration** | PASS | Verified via `scripts/smoke_test.py`: 9 unique Amazon.in candidate ASINs retrieved with prices & canonical URLs |
 | **Price & Seller-Count Audit** | PASS | Verified via `scripts/validate_20_listings.py`: 20/20 listings tested; 95% price extraction, 100% null seller_count handling (ADR-004) |
-| **Database Persistence & Migrations** | PASS | Verified via `backend/tests/test_persistence.py`: SQLite persistence, relationships, deduplication, restart survival |
+| **Database Persistence** | PASS | SQLite persistence tests cover relationships, deduplication, restart survival, and PostgreSQL URL normalization; a live PostgreSQL connection remains to be verified after database provisioning |
 | **Frontend Production Build** | PASS | Next.js 16.4.1 Turbopack build succeeded with zero TS/lint errors |
 | **Frontend Live UI & Connectivity** | PASS | Verified `http://localhost:3000` connected to backend |
 | **Backend Mock Integration Tests** | PASS | Complete mock coverage for Gemini vision analysis and SerpApi search discovery |
@@ -142,11 +148,11 @@
 - `docs/IMPLEMENTATION_STATUS.md` — Living audit log and phase tracker
 - `docs/PRICE_AND_SELLER_COUNT_VALIDATION.md` — Comprehensive Phase 6 marketplace metrics audit report
 - `scripts/validate_20_listings.py` — 20-listing manual verification audit script
-- `backend/app/database.py` — SQLite database engine, session factory, and automatic table creation
+- `backend/app/database.py` — SQLAlchemy engine, SQLite/PostgreSQL URL selection, session factory, and automatic table creation
 - `backend/app/models/search.py` — SQLAlchemy models (SearchModel, ImageAnalysisModel, ProductCandidateModel, MatchFeedbackModel)
 - `backend/app/repositories/search_repository.py` — SearchRepository abstraction with save, get_by_id, list_searches, confirm_candidate
 - `backend/tests/test_price_seller_validation.py` — 7 unit tests for price and seller-count handling
-- `backend/tests/test_persistence.py` — 7 unit & integration tests for SQLite persistence, pagination, and restart survival
+- `backend/tests/test_persistence.py` — SQLite persistence tests plus PostgreSQL URL normalization and engine initialization coverage
 - `frontend/src/components/CandidateCard.tsx` — Product candidate card with price, seller count, match score meter, signals breakdown, and confirmation action
 - `frontend/src/components/CandidateList.tsx` — Ranked candidates list, low-confidence warnings, confirmation banner, and reset action
 - `README.md` — Project setup and developer instructions

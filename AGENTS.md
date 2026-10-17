@@ -53,8 +53,9 @@ If implementation realities or provider API updates require a departure from eit
 | **Vision AI** | Google Gemini API | `gemini-1.5-flash` (or `gemini-2.0-flash`) via `google-generativeai` | Planned (Phase 3) | Multimodal visual attribute extraction & structured search query generation |
 | **Marketplace Search** | SerpApi Amazon Search API | `engine=amazon`, `amazon_domain=amazon.in`, HTTPX 0.28+ | Planned (Phase 4) | Query Amazon India search results, parse organic listings, retrieve ASIN, title, price |
 | **Candidate Ranking** | Pure Python ranking engine | In-memory deterministic scoring | Planned (Phase 5) | Attribute-weighted matching, contradiction penalties, confidence categorization |
-| **Database** | SQLite (Dev) / PostgreSQL (Prod) | SQLAlchemy / raw SQLite repo | Planned (Phase 8) | Persist searches, extracted attributes, candidate listings, seller feedback |
+| **Database** | SQLite (local) / PostgreSQL (deployed) | SQLAlchemy 2, psycopg 3 | Implemented (Phase 8) | Persist searches, extracted attributes, candidate listings, seller feedback |
 | **Testing** | pytest, pytest-asyncio, Jest / Playwright | pytest (Backend) | Planned (Phase 1) | Unit tests, mocked API integration tests, schema validation, live smoke tests |
+| **Deployment** | Render free web service / Vercel Hobby | Render Blueprint (`render.yaml`), Vercel Git integration (`frontend/vercel.json`) | Configuration added (Phase 10) | Deploy services and verify using externally provided PostgreSQL URL |
 
 ---
 
@@ -85,7 +86,7 @@ If implementation realities or provider API updates require a departure from eit
 [Candidate Ranking Engine] -> Weighted scoring (brand 25%, model 30%, category 15%, variant 20%, other 10%)
          | (8) Ranked candidates with confidence & match signals
          v
-[Result Service & Repository] -> Persists Search, Analysis, Candidates to SQLite
+[Result Service & Repository] -> Persists Search, Analysis, Candidates through SQLAlchemy
          | (9) JSON Response (search_id, status, analysis, top 3 candidates)
          v
 [Seller Client (Next.js)]
@@ -99,7 +100,7 @@ If implementation realities or provider API updates require a departure from eit
 - **Backend API Layer**: Handles routing, multipart parsing, request validation, and error wrapping.
 - **Integration Adapters**: `gemini_client.py` and `serpapi_client.py` strictly isolate external vendor SDKs and HTTP contracts. All vendor-specific errors are translated into domain-level exceptions.
 - **Domain / Services**: Pure business logic (matching algorithms, query planning, candidate normalization) is independent of external network protocols.
-- **Persistence Layer**: Repository abstraction decouples domain models from SQLite/PostgreSQL storage.
+- **Persistence Layer**: Repository abstraction decouples domain models from storage. SQLite remains the local default; PostgreSQL is supported through `DATABASE_URL` for deployment.
 
 ---
 
@@ -133,9 +134,9 @@ All AI coding agents and human contributors must adhere to these non-negotiable 
 | **Phase 4** | SerpApi Amazon Search Integration | **COMPLETED** | `SerpApiClient` adapter, `SearchService` (query dispatch, bounded fallback, ASIN deduplication), price parsing, `scripts/smoke_test.py`, live verification | None | 9 SerpApi tests PASS (30 total tests in 1.62s), live smoke test PASS (9 Amazon.in candidates discovered) | None |
 | **Phase 6** | Price & Seller-Count Validation | **COMPLETED** | Price normalization (float/string/prices array), explicit currency (`INR`), null handling for missing prices/seller count, 20-listing manual verification audit | None | 7 unit tests PASS (67 total backend tests PASS), 20-listing audit script PASS, `docs/PRICE_AND_SELLER_COUNT_VALIDATION.md` | Seller count limitation documented per ADR-004 |
 | **Phase 7** | Complete Frontend Workflow | **COMPLETED** | Next.js seller UI (`CandidateCard.tsx`, `CandidateList.tsx`), match score meters, confidence categorization, explainable signals breakdown, ASIN copy & external links, candidate confirmation | None | Next.js production build PASS, browser subagent live connectivity check PASS | None |
-| **Phase 8** | Persistence & Search History | **COMPLETED** | SQLite models (`SearchModel`, `ImageAnalysisModel`, `ProductCandidateModel`, `MatchFeedbackModel`), `SearchRepository`, paginated history endpoint `GET /api/product-matches`, confirmation persistence | None | 7 unit & integration tests PASS in `test_persistence.py` (74 total backend tests PASS) | None |
+| **Phase 8** | Persistence & Search History | **COMPLETED** | SQLAlchemy models (`SearchModel`, `ImageAnalysisModel`, `ProductCandidateModel`, `MatchFeedbackModel`), SQLite local default and PostgreSQL URL support, `SearchRepository`, paginated history endpoint `GET /api/product-matches`, confirmation persistence | None | SQLite persistence tests and PostgreSQL URL normalization tests | PostgreSQL connection not yet verified against a provisioned deployment database |
 | **Phase 9** | Evaluation & Reliability | **IN_PROGRESS** | Evaluation dataset, metrics framework, latency percentiles | Curate 100-sample labelled dataset, accuracy and reliability evaluation | — | — |
-| **Phase 10** | Deployment & Handover | **NOT_STARTED** | — | Production configs, smoke test scripts, deployment docs | — | — |
+| **Phase 10** | Deployment & Handover | **IN_PROGRESS** | Free Render web service Blueprint, Vercel Next.js project config, and deployment instructions; no managed database is provisioned | Deploy frontend/backend, set provider credentials and external PostgreSQL URL, verify live end-to-end workflow | Configuration reviewed; live deployment not yet performed | Requires external PostgreSQL URL, Gemini and SerpApi keys, and deployment account access |
 
 ---
 
@@ -149,6 +150,8 @@ All AI coding agents and human contributors must adhere to these non-negotiable 
 | **ADR-004** | Treat Seller Count as `null` / "Unavailable" from SerpApi Search endpoint | Verified that `engine=amazon` does not reliably provide seller/offer counts in search result snippets; scraping or extra calls without approval is prohibited | Guess from number of search results (rejected), call `amazon_product` per result (unapproved extra cost) | Confirmed | 2026-10-15 |
 | **ADR-005** | Explainable heuristic scoring (Brand 25%, Model 30%, Category 15%, Variant 20%, Other 10%) | Transparent and debuggable; allows sellers to understand why a candidate matched | Opaque ML classifier, cross-encoder neural model | Provisional (subject to Phase 9 evaluation) | 2026-10-15 |
 | **ADR-006** | SQLite with Repository Pattern for local development | Zero-config local persistence that transitions easily to PostgreSQL when deployed | PostgreSQL only (extra local dependency), in-memory dict (lost on restart) | Confirmed | 2026-10-15 |
+| **ADR-007** | PostgreSQL through `DATABASE_URL` for deployed service; retain SQLite locally | Render supplies a PostgreSQL URL, and SQLAlchemy can use the same models and repository for both; normalize provider URL schemes to psycopg 3 | SQLite in production (ephemeral filesystem), separate persistence implementations | Confirmed | 2026-10-17 |
+| **ADR-008** | Deploy API on Render free web service and frontend on Vercel Hobby; database remains externally managed | Uses the requested free hosting tiers while keeping PostgreSQL outside Render and avoiding a paid managed database | Paid hosting plans, Render-managed PostgreSQL, self-hosted infrastructure | Confirmed | 2026-10-17 |
 
 ---
 

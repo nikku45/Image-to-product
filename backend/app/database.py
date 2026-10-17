@@ -11,11 +11,20 @@ _engine = None
 _SessionFactory = None
 
 
+def normalize_database_url(db_url: str) -> str:
+    """Select the installed PostgreSQL driver for standard provider URLs."""
+    if db_url.startswith("postgres://"):
+        return f"postgresql+psycopg://{db_url[len('postgres://'):]}"
+    if db_url.startswith("postgresql://"):
+        return f"postgresql+psycopg://{db_url[len('postgresql://'):]}"
+    return db_url
+
+
 def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
-        db_url = settings.database_url
+        db_url = normalize_database_url(settings.database_url)
 
         # Ensure sqlite directory exists if file-based sqlite
         if db_url.startswith("sqlite:///"):
@@ -26,8 +35,8 @@ def get_engine():
                     os.makedirs(db_dir, exist_ok=True)
 
         connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
-        _engine = create_engine(db_url, connect_args=connect_args)
-        logger.info(f"Initialized database engine: {db_url}")
+        _engine = create_engine(db_url, connect_args=connect_args, pool_pre_ping=True)
+        logger.info("Initialized database engine: %s", _engine.url.drivername)
     return _engine
 
 

@@ -113,9 +113,9 @@ Initial storage:
 
 SQLite for local development and a small single-instance prototype.
 Local temporary image storage for development.
-PostgreSQL and managed object storage when a deployed multi-user environment requires them.
+PostgreSQL and managed object storage for deployed environments. The Render deployment uses PostgreSQL through `DATABASE_URL`; local development can continue to use SQLite.
 
-Use a repository abstraction for persistence so the application can migrate from SQLite to PostgreSQL without rewriting the matching logic.
+Use SQLAlchemy and a repository abstraction so local SQLite and deployed PostgreSQL share the same models and persistence logic without rewriting the matching logic.
 
 Do not store uploaded images permanently unless required by a documented product feature.
 
@@ -569,6 +569,8 @@ GEMINI_MODEL=
 SERPAPI_API_KEY=
 
 DATABASE_URL=sqlite:///./data/app.db
+# For deployment, set DATABASE_URL to the PostgreSQL URL provided by the hosting provider.
+# Example format: postgresql://USER:PASSWORD@HOST:PORT/DATABASE
 
 MAX_UPLOAD_SIZE_MB=10
 MAX_SEARCH_QUERIES=2

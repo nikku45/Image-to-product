@@ -15,14 +15,15 @@ A full-stack web application that helps marketplace sellers turn a **product pho
 7. [Prerequisites](#prerequisites)
 8. [Environment Configuration](#environment-configuration)
 9. [Setup and Run (Local Development)](#setup-and-run-local-development)
-10. [API Reference](#api-reference)
-11. [Data Model and Persistence](#data-model-and-persistence)
-12. [Candidate Ranking](#candidate-ranking)
-13. [Testing and Smoke Tests](#testing-and-smoke-tests)
-14. [Error Handling](#error-handling)
-15. [Security and Privacy](#security-and-privacy)
-16. [Known Limitations](#known-limitations)
-17. [Further Documentation](#further-documentation)
+10. [Deploy on Render and Vercel](#deploy-on-render-and-vercel)
+11. [API Reference](#api-reference)
+12. [Data Model and Persistence](#data-model-and-persistence)
+13. [Candidate Ranking](#candidate-ranking)
+14. [Testing and Smoke Tests](#testing-and-smoke-tests)
+15. [Error Handling](#error-handling)
+16. [Security and Privacy](#security-and-privacy)
+17. [Known Limitations](#known-limitations)
+18. [Further Documentation](#further-documentation)
 
 ---
 
@@ -34,7 +35,7 @@ A full-stack web application that helps marketplace sellers turn a **product pho
 | Reduce variant confusion | Ranking compares attributes and applies penalties for contradictions (e.g. model mismatch) |
 | Transparent decisions | Each candidate shows match score, confidence band, and signal breakdown—not opaque ML probabilities |
 | Traceable marketplace data | ASIN, title, URL, price (when present), and `retrieved_at` timestamps come from validated API responses |
-| Audit trail | SQLite stores searches, analysis, candidates, and seller confirmations |
+| Audit trail | SQLAlchemy stores searches, analysis, candidates, and seller confirmations in SQLite locally or PostgreSQL when deployed |
 
 **Out of scope for this prototype:** Google Lens, direct Amazon scraping, multi-marketplace support, authentication, background job queues, and guaranteed seller/offer counts from search snippets.
 
@@ -61,7 +62,7 @@ flowchart LR
   G --> H{Correct listing?}
   H -->|Yes| I[Confirm ASIN]
   H -->|No| J[Pick another or upload new photo]
-  I --> K[Feedback stored in SQLite]
+  I --> K[Feedback stored in the configured database]
 ```
 
 ---
@@ -83,7 +84,7 @@ flowchart TB
     SRC["SearchService"]
     MAT["MatchingService"]
     REPO["SearchRepository"]
-    DB[("SQLite<br/>backend/data/app.db")]
+    DB[("Database<br/>SQLite locally / PostgreSQL when deployed")]
     API --> IMG --> ANA
     ANA --> SRC --> MAT --> REPO --> DB
   end
@@ -107,7 +108,7 @@ flowchart TB
 | Images | Pillow | Signature checks, EXIF strip, orientation, size limits |
 | Vision AI | `google-genai` → configurable model (default `gemini-3.8-flash`) | Structured attribute extraction |
 | Marketplace | HTTPX → SerpApi Amazon Search | Amazon.in organic results |
-| Persistence | SQLAlchemy + SQLite | Searches, analysis, candidates, feedback |
+| Persistence | SQLAlchemy + SQLite / PostgreSQL | Searches, analysis, candidates, feedback |
 
 ---
 
@@ -126,7 +127,7 @@ sequenceDiagram
   participant S as SerpApiClient
   participant M as MatchingService
   participant R as SearchRepository
-  participant D as SQLite
+  participant D as Database
 
   U->>F: Select / drop image file
   F->>B: POST /api/product-matches (multipart image)
@@ -318,7 +319,7 @@ copy .env.example .env
 | `GEMINI_MODEL` | Default `gemini-3.8-flash` |
 | `GEMINI_TIMEOUT_SECONDS` | Default `120` (do not set below ~60 for vision) |
 | `SERPAPI_API_KEY` | SerpApi key |
-| `DATABASE_URL` | Default `sqlite:///./data/app.db` (relative to backend cwd) |
+| `DATABASE_URL` | SQLAlchemy URL; defaults to `sqlite:///./data/app.db` locally. Set to the PostgreSQL URL provided by Render when deployed. |
 | `MAX_UPLOAD_SIZE_MB` | Default `10` |
 | `MAX_SEARCH_QUERIES` | Cap on Gemini queries sent to SerpApi |
 | `MAX_CANDIDATES_PER_QUERY` | SerpApi result cap per query |
@@ -348,10 +349,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-pip install sqlalchemy
 ```
-
-> **Note:** Persistence uses SQLAlchemy. If `pip install -r requirements.txt` alone misses it, install `sqlalchemy` explicitly as above.
 
 Create or edit `backend/.env` with your API keys, then:
 
@@ -385,6 +383,40 @@ python scripts/smoke_test.py --base-url http://127.0.0.1:8000
 ```
 
 The script synthesizes a sample product image, uploads it, and prints analysis plus discovered candidates.
+
+---
+
+## Deploy on Render and Vercel
+
+The deployment configuration uses Render's **free web service** and Vercel's **free Hobby plan**. It does not provision a database or any other paid service. You provide the PostgreSQL connection URL from your chosen external database provider.
+
+### Backend: Render
+
+The repository-root [`render.yaml`](./render.yaml) is a Render Blueprint for the Python API. It deploys only the backend as a free web service; it does **not** create a Render PostgreSQL instance.
+
+1. In Render, create a Blueprint from this GitHub repository and select the `master` branch.
+2. When prompted, provide these environment values:
+   - `DATABASE_URL`: your externally hosted PostgreSQL connection URL. Use a URL reachable from Render; include any SSL parameters your provider requires.
+   - `GEMINI_API_KEY` and `SERPAPI_API_KEY`: your provider credentials.
+   - `CORS_ORIGINS`: the Vercel production origin, for example `https://your-project.vercel.app` (no trailing slash). Add any custom frontend origin as a comma-separated value.
+3. Keep these values in Render's environment settings. Do not put real credentials in `render.yaml` or commit them.
+4. After the first deploy, verify `https://<render-service>.onrender.com/api/health`.
+
+The free Render web service can spin down when idle and take time to wake on the next request. Its filesystem is ephemeral; search history is stored in your external PostgreSQL database, not on the service disk. Free services are subject to Render's current usage limits.
+
+### Frontend: Vercel
+
+Vercel's native Git integration is used rather than a deployment YAML workflow. [`frontend/vercel.json`](./frontend/vercel.json) identifies the Next.js framework and build command; the Vercel project setting supplies the monorepo root.
+
+1. Import the same GitHub repository into Vercel and set **Root Directory** to `frontend`.
+2. Use the free Hobby plan and connect the `master` branch. Vercel should detect Next.js; keep the default output settings.
+3. In the Vercel project environment variables, set `NEXT_PUBLIC_BACKEND_URL` to the deployed Render API origin, for example `https://<render-service>.onrender.com` (no trailing slash). Set it for Production, and for Preview only if preview deployments should call the production backend.
+4. Redeploy after changing this variable: `NEXT_PUBLIC_BACKEND_URL` is embedded into the frontend at build time.
+5. Ensure Render's `CORS_ORIGINS` contains the exact Vercel production origin and redeploy the backend if you change it.
+
+Deploy Vercel once first if needed to obtain its production domain, then enter that domain in Render's `CORS_ORIGINS`. Set `NEXT_PUBLIC_BACKEND_URL` in Vercel to the Render service URL before the final frontend redeploy.
+
+---
 
 ### Production-style frontend build
 
@@ -509,7 +541,7 @@ erDiagram
   }
 ```
 
-SQLite file path follows **`DATABASE_URL`**. When running Uvicorn from `backend/`, the default file is **`backend/data/app.db`**.
+The database is selected by **`DATABASE_URL`**. Local development defaults to SQLite (`sqlite:///./data/app.db`, relative to the backend working directory). For Render, set `DATABASE_URL` to the PostgreSQL connection URL from the Render database; both `postgres://` and `postgresql://` URLs are supported and routed through the installed psycopg 3 driver. The application creates its tables automatically at startup on a new database.
 
 ---
 
@@ -610,7 +642,7 @@ The frontend **`ApiClientError`** surfaces `code`, `message`, and optional `deta
 
 ## Implementation Status (Summary)
 
-Phases **0–8** are complete (upload, Gemini, SerpApi, ranking, frontend workflow, SQLite persistence). Phase **9** (evaluation dataset and reliability metrics) is in progress; Phase **10** (deployment handover) is not started. See [docs/IMPLEMENTATION_STATUS.md](./docs/IMPLEMENTATION_STATUS.md) for the live checklist.
+Phases **0–8** are complete (upload, Gemini, SerpApi, ranking, frontend workflow, and SQLite/PostgreSQL persistence). Phase **9** (evaluation dataset and reliability metrics) is in progress; Phase **10** (deployment handover) is not started. See [docs/IMPLEMENTATION_STATUS.md](./docs/IMPLEMENTATION_STATUS.md) for the live checklist.
 
 ---
 
